@@ -13,6 +13,8 @@ import {
   WifiIcon,
 } from "lucide-react";
 
+import defaultAvatar from "../assets/avatar-default.png";
+
 interface NavItem {
   label: string;
   icon: React.ReactNode;
@@ -111,12 +113,13 @@ export const Layout: React.FC = () => {
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <img
-                    src={
-                        user?.profile_image_url ||
-                        "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100"
-                    }
-                    alt={user?.username}
+                    src={user?.profile_image_url ? user.profile_image_url : defaultAvatar}
+                    alt={user?.username || "avatar"}
                     className="w-10 h-10 rounded-full object-cover"
+                    onError={(e) => {
+                      // fallback si URL cassée
+                      e.currentTarget.src = defaultAvatar;
+                    }}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">
@@ -136,9 +139,7 @@ export const Layout: React.FC = () => {
                       onClick={closeSidebarMobile}
                       className={({ isActive }) =>
                           `w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                              isActive
-                                  ? "bg-blue-50 text-blue-600"
-                                  : "text-gray-700 hover:bg-gray-50"
+                              isActive ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50"
                           }`
                       }
                   >
