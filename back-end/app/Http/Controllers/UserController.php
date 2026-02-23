@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\UserProvider;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -138,6 +141,63 @@ class UserController extends Controller
         $user->update(['password' => Hash::make($request->new_password)]);
 
         return $this->success($user,'Password updated successfully');
+    }    
+
+    public function storeUserProvider(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'unique:users,username'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:6'],
+            'role' => ['required', Rule::in(['admin', 'client'])],
+
+            'router_ip' => ['required', 'ip'],
+
+            'user_providers' => ['required', 'array', 'min:1'],
+
+            'user_providers.*.provider_id' => ['required', 'integer', 'exists:providers,id', 'distinct'],
+            'user_providers.*.oid_byte_in' => ['required', 'string', 'max:255'],
+            'user_providers.*.oid_byte_out' => ['required', 'string', 'max:255'],
+            'user_providers.*.monthly_limit' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $user = DB::transaction(function () use ($validated) {
+
+            $user = User::create([
+                'name' => $validated['name'],
+                'username' => $validated['username'],
+                'phone' => $validated['phone'] ?? null,
+                'email' => $validated['email'],
+                'password' => $validated['password'], // cast hashed dans le model => OK
+                'role' => $validated['role'],
+                'is_active' => true, // default
+            ]);
+
+            foreach ($validated['user_providers'] as $up) {
+                // 1 Mega (MiB) = 1024*1024 octets
+                $monthlyLimitBytes = (int) round(((float) $up['monthly_limit']) * 1024 * 1024);
+
+                UserProvider::create([
+                    'user_id' => $user->id,
+                    'provider_id' => (int) $up['provider_id'],
+                    'router_ip' => $validated['router_ip'],
+                    'oid_byte_in' => $up['oid_byte_in'],
+                    'oid_byte_out' => $up['oid_byte_out'],
+                    'monthly_limit' => $monthlyLimitBytes,
+                    'is_active' => true, // default
+                ]);
+            }
+
+            return $user->load(['userProviders']);
+        });
+
+        return $this->success($user, 'User Created', 201);
+
+        
     }
+
     
+
 }

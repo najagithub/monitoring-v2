@@ -6,6 +6,7 @@ use App\Models\Provider;
 use App\Models\UserProvider;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class UserProviderController extends Controller
 {
@@ -83,5 +84,75 @@ class UserProviderController extends Controller
             ->get();
 
         return $this->success($providers);
+    }
+
+    public function updateMonthlyLimit(Request $request)
+    {
+        $request->validate([
+            'id_user'        => 'required|integer|exists:users,id',
+            'provider_id'    => 'required|integer|exists:providers,id',
+            'monthly_limit'  => 'nullable|numeric|min:0',
+            'oid_in'         => 'nullable|string|max:255',
+            'oid_out'        => 'nullable|string|max:255',
+            'router_ip'        => 'nullable|string|max:255|ip',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $userProvider = UserProvider::where('user_id', $request->id_user)
+                ->where('provider_id', $request->provider_id)
+                ->first();
+
+            if (!$userProvider) {
+                return response()->json([
+                    'message' => 'Configuration user/provider introuvable.'
+                ], 404);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Mise à jour dynamique (seulement les champs envoyés)
+            |--------------------------------------------------------------------------
+            */
+
+            // Monthly limit (convert MB → Bytes)
+            if ($request->has('monthly_limit')) {
+                $userProvider->monthly_limit = 
+                    $request->monthly_limit * 1024 * 1024;
+            }
+
+            // OID IN
+            if ($request->has('oid_in')) {
+                $userProvider->oid_in = $request->oid_in;
+            }
+
+            // OID OUT
+            if ($request->has('oid_out')) {
+                $userProvider->oid_out = $request->oid_out;
+            }
+
+            if ($request->has('router_ip')) {
+                $userProvider->router_ip = $request->router_ip;
+            }
+
+            $userProvider->save();
+
+            DB::commit();
+
+            return $this->success(
+                $userProvider,
+                'Configuration mise à jour avec succès.'
+            );
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return $this->error(
+                'Erreur lors de la mise à jour.',
+                $e->getMessage(),
+                500
+            );
+        }
     }
 }

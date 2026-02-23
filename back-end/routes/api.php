@@ -4,6 +4,7 @@ use App\Http\Controllers\ConsumptionHistoryController;
 use App\Http\Controllers\ProviderController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserProviderController;
+use App\Http\Controllers\UserSummaryController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function() {
@@ -28,10 +29,14 @@ Route::prefix('v1')->group(function() {
 
         Route::apiResource('user-providers', UserProviderController::class);
         Route::get('/users/{user}/active-providers', [UserProviderController::class, 'activeProviders']);
+        
         Route::middleware('is.admin')->group(function () {
+            Route::post('/users/create/user-providers', [UserController::class, 'storeUserProvider']);
             Route::post('/users/{user}/toggle-active', [UserController::class, 'toggleActive']);
             Route::apiResource('providers', ProviderController::class)->except(['index']);
             Route::post('/users/{user}/update-password', [UserController::class, 'updatePassword']);
+            Route::get('/admin/users/summary', [UserSummaryController::class, 'index']);
+            Route::post('/admin/user-provider/monthly-limit', [UserProviderController::class, 'updateMonthlyLimit']);
         });
 
 

@@ -1,8 +1,55 @@
-import { Provider, UserProvider, ConsumptionHistory, MonthlyConsumption } from '../types';
+import { User, Provider, UserProvider, ConsumptionHistory, MonthlyConsumption } from '../types';
 
 export const mockProviders: Provider[] = [
   { id: 1, name: 'YAS', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
   { id: 2, name: 'Starlink', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
+];
+
+export const mockUsers: User[] = [
+  {
+    id: 1,
+    username: 'admin',
+    email: 'admin@example.com',
+    phone: '+1234567890',
+    role: 'admin',
+    is_active: true,
+    profile_image: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
+  },
+  {
+    id: 2,
+    username: 'client1',
+    email: 'client1@example.com',
+    phone: '+1234567891',
+    role: 'client',
+    is_active: true,
+    profile_image: 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=100',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
+  },
+  {
+    id: 3,
+    username: 'client2',
+    email: 'client2@example.com',
+    phone: '+1234567892',
+    role: 'client',
+    is_active: true,
+    profile_image: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=100',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
+  },
+  {
+    id: 4,
+    username: 'client3',
+    email: 'client3@example.com',
+    phone: '+1234567893',
+    role: 'client',
+    is_active: false,
+    profile_image: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
+  },
 ];
 
 export const mockUserProviders: UserProvider[] = [
