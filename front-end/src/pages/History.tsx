@@ -10,17 +10,26 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-import { mockUsers, formatBytes } from '../data/mockData';
-import type { Provider, DailyConsumptionItem } from '../types';
+import { formatBytes } from '../data/mockData';
+import type {Provider, DailyConsumptionItem, ClientUser} from '../types';
 
-import { listProvidersRequest, myListProvidersRequest } from '../services/providers.services';
+import {
+  listProvidersRequest,
+  myListProvidersRequest,
+  listClientsRequest,
+} from '../services/providers.services';
+
 import { getConsumptionHistoryRequest } from '../services/consumptionHistory.services';
 
 export const History: React.FC = () => {
   const { user } = useAuth();
 
   const isAdmin = user?.role === 'admin';
-  const clientUsers = isAdmin ? mockUsers.filter((u) => u.role === 'client') : [];
+
+  // ✅ clients dynamiques
+  const [clientUsers, setClientUsers] = useState<ClientUser[]>([]);
+  const [isClientsLoading, setIsClientsLoading] = useState(false);
+  const [clientsError, setClientsError] = useState<string>('');
 
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [selectedUser, setSelectedUser] = useState<number>(isAdmin ? 0 : user?.id || 0);
@@ -47,6 +56,51 @@ export const History: React.FC = () => {
     setCurrentPage(1);
   }, [selectedProvider, selectedUser, startDate, endDate, pageSize]);
   // ----------------------------------------------------
+
+  // ✅ Load clients (admin only)
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadClients = async () => {
+      if (!isAdmin) {
+        setClientUsers([]);
+        setClientsError('');
+        setIsClientsLoading(false);
+        return;
+      }
+
+      try {
+        setIsClientsLoading(true);
+        setClientsError('');
+
+        // si tu veux brancher AbortController à axios, on peut adapter api client
+        const data = await listClientsRequest();
+        setClientUsers(data || []);
+
+        // optionnel: si selectedUser est 0 et qu'il n'y a qu'un seul client
+        // tu peux auto-select (à toi de voir)
+        // if (selectedUser === 0 && data?.length === 1) setSelectedUser(data[0].id);
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return;
+        setClientUsers([]);
+        setClientsError(e?.message || 'Erreur lors du chargement des clients.');
+      } finally {
+        setIsClientsLoading(false);
+      }
+    };
+
+    loadClients();
+    return () => controller.abort();
+  }, [isAdmin]);
+
+  // ✅ si rôle change (admin/client), ajuste selectedUser
+  useEffect(() => {
+    if (!isAdmin) {
+      setSelectedUser(user?.id || 0);
+    } else {
+      setSelectedUser(0);
+    }
+  }, [isAdmin, user?.id]);
 
   // -------- Providers load (selon role) --------
   useEffect(() => {
@@ -108,6 +162,7 @@ export const History: React.FC = () => {
           provider_id: providerId,
           start_date: startDate,
           end_date: endDate,
+          // signal: controller.signal, // seulement si ton service supporte AbortController
         });
 
         const sorted = [...(data || [])].sort(
@@ -164,7 +219,6 @@ export const History: React.FC = () => {
   // -------------------- Pagination computed --------------------
   const totalItems = history.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-
   const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const pagedHistory = useMemo(() => {
@@ -174,20 +228,18 @@ export const History: React.FC = () => {
   }, [history, safeCurrentPage, pageSize]);
 
   const pageNumbers = useMemo(() => {
-    // simple windowed pagination: show up to 5 pages
     const windowSize = 5;
     const half = Math.floor(windowSize / 2);
 
     let start = Math.max(1, safeCurrentPage - half);
     let end = Math.min(totalPages, start + windowSize - 1);
 
-    // adjust start if we're at the end
     start = Math.max(1, end - windowSize + 1);
 
     const pages: number[] = [];
     for (let p = start; p <= end; p++) pages.push(p);
     return pages;
-  }, [safeCurrentPage, totalPages, pageSize]);
+  }, [safeCurrentPage, totalPages]);
   // ------------------------------------------------------------
 
   // -------- Export CSV --------
@@ -245,6 +297,12 @@ export const History: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900">Filtres</h2>
           </div>
 
+          {isAdmin && clientsError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {clientsError}
+              </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {isAdmin && (
                 <div>
@@ -252,17 +310,20 @@ export const History: React.FC = () => {
                   <select
                       value={selectedUser}
                       onChange={(e) => setSelectedUser(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={isClientsLoading}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   >
-                    <option value={0}>-- Choisir un utilisateur --</option>
+                    <option value={0}>
+                      {isClientsLoading ? 'Chargement...' : '-- Choisir un utilisateur --'}
+                    </option>
                     {clientUsers.map((u) => (
                         <option key={u.id} value={u.id}>
-                          {u.username}
+                          {u.name}
                         </option>
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Obligatoire (vous devrez séléctionner un utilisateur).
+                    Obligatoire (vous devrez sélectionner un utilisateur).
                   </p>
                 </div>
             )}

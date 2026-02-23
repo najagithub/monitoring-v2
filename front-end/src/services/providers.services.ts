@@ -1,5 +1,5 @@
 import api from './api';
-import type { Provider } from "../types";
+import type {ApiResponse, ClientUser, Provider} from "../types";
 
 export async function listProvidersRequest() {
     const { data } = await api.get<Provider[]>("/providers");
@@ -26,4 +26,9 @@ export async function updateProviderRequest(
 
 export async function deleteProviderRequest(id: number) {
     await api.delete(`/providers/${id}`);
+}
+
+export async function listClientsRequest() {
+    const { data } = await api.get<ApiResponse<ClientUser[]>>("/users/all/clients");
+    return data.data; // => ClientUser[]
 }

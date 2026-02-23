@@ -102,3 +102,10 @@ export type DailyConsumptionItem = {
   created_at: string;
   updated_at: string;
 };
+export type ClientUser = {
+  id: number;
+  name: string;
+  email: string;
+  created_at: string;
+  profile_image_url?: string | null;
+};

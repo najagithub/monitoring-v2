@@ -32,6 +32,7 @@ Route::prefix('v1')->group(function() {
         
         Route::middleware('is.admin')->group(function () {
             Route::post('/users/create/user-providers', [UserController::class, 'storeUserProvider']);
+            Route::get('/users/all/clients', [UserController::class, 'listClients']);
             Route::post('/users/{user}/toggle-active', [UserController::class, 'toggleActive']);
             Route::apiResource('providers', ProviderController::class)->except(['index']);
             Route::post('/users/{user}/update-password', [UserController::class, 'updatePassword']);

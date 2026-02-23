@@ -65,8 +65,8 @@ const DEFAULT_ROW: ProviderRow = {
 const mbToBytes = (mb: number) => Math.round(mb * 1024 * 1024);
 const bytesToMb = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
 
-// ✅ Mets ton base URL dans .env : VITE_API_BASE_URL=http://127.0.0.1:8000
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '';
+// ✅ Mets ton base URL dans .env : VITE_API_URL=http://127.0.0.1:8000
+const API_BASE = (import.meta as any).env?.VITE_API_URL || '';
 
 const normalizeUrl = (url?: string | null) => {
   const u = (url || '').trim();

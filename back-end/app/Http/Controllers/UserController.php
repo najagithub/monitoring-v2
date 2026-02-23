@@ -47,7 +47,6 @@ class UserController extends Controller
         return $this->success($user, 'User Created' ,201);
     }
 
-
     public function show(User $user)
     {
         return $this->success($user->load('userProviders.provider'));
@@ -198,6 +197,15 @@ class UserController extends Controller
         
     }
 
+    public function listClients()
+    {
+        $clients = User::where('role', 'client')
+                        ->select('id', 'name', 'email', 'created_at')
+                        ->orderBy('created_at', 'desc')
+                        ->get();
+
+        return $this->success($clients);
+    }
     
 
 }
