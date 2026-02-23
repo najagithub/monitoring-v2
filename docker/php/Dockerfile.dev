@@ -1,0 +1,15 @@
+FROM php:8.3-cli-alpine
+
+WORKDIR /var/www
+
+# deps + php extensions
+RUN apk add --no-cache \
+    bash git unzip icu-dev oniguruma-dev libzip-dev mysql-client $PHPIZE_DEPS \
+  && docker-php-ext-install pdo_mysql mbstring intl zip \
+  && pecl install redis \
+  && docker-php-ext-enable redis
+
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# (Optionnel) si tu veux gd, etc, on ajoutera après
