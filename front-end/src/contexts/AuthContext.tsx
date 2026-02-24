@@ -1,32 +1,28 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import {User, AuthContextType, UpdateMyProfilePayload} from '../types';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import type { User, AuthContextType, UpdateMyProfilePayload } from "../types";
 import {
   loginRequest,
   meRequest,
   logoutRequest,
   updateMyProfileRequest,
-  updateMyPasswordRequest
+  updateMyPasswordRequest,
 } from "../services/auth.services.ts";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-type LoginResponse ={
+type LoginResponse = {
   data?: {
     token?: string;
-    user?: User
-  }
+    user?: User;
+  };
 };
 
 function pickToken(res: LoginResponse) {
-  return (
-      res.data?.token || null
-  );
+  return res.data?.token || null;
 }
 
 function pickUser(res: LoginResponse) {
-  return (
-      res.data?.user || null
-  );
+  return res.data?.user || null;
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -43,8 +39,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     else localStorage.removeItem("user");
   };
 
+  /**
+   * ✅ Update partiellement le user (ex: network_choice) et persiste dans localStorage
+   */
+  const updateUser = (patch: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem("user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   const fetchMe = async () => {
-    const data  = await meRequest();
+    const data = await meRequest(); // doit retourner User
     setSession(data, localStorage.getItem("token"));
     return data;
   };
@@ -58,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // On hydrate vite depuis localStorage (UX), puis on revalide via /me
+    // Hydrate vite depuis localStorage (UX), puis revalide via /me
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
@@ -76,13 +84,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
   }, []);
 
-
   const login = async (emailOrUsername: string, password: string) => {
-    setSession(null, null)
-    const  data  = await loginRequest(
-      emailOrUsername, // OU "email": emailOrUsername
-      password,
-    );
+    setSession(null, null);
+
+    const data = await loginRequest(emailOrUsername, password);
 
     const token = pickToken(data);
     if (!token) throw new Error("Token manquant dans la réponse login");
@@ -92,45 +97,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(u, token);
     } else {
       localStorage.setItem("token", token); // si pas de user dans la réponse
-
       await fetchMe();
     }
   };
 
   const logout = async () => {
     try {
-      // si tu as un endpoint logout côté laravel
       await logoutRequest();
     } catch {
       // ignore si pas dispo
     } finally {
-      setUser(null);
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
+      setSession(null, null);
     }
   };
 
-  const updateProfile = async (data: UpdateMyProfilePayload) => {
-
-    const updated  = await updateMyProfileRequest(data);
+  const updateProfile = async (payload: UpdateMyProfilePayload) => {
+    const updated = await updateMyProfileRequest(payload); // doit retourner User
     setSession(updated, localStorage.getItem("token"));
   };
 
   const updatePassword = async (currentPassword: string, newPassword: string) => {
-    await updateMyPasswordRequest( currentPassword, newPassword);
+    await updateMyPasswordRequest(currentPassword, newPassword);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthLoading, login, logout, updateProfile, updatePassword }}>
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider
+          value={{
+            user,
+            isAuthLoading,
+            login,
+            logout,
+            updateProfile,
+            updatePassword,
+            updateUser, // ✅ AJOUT
+          }}
+      >
+        {children}
+      </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

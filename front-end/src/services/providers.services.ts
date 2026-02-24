@@ -1,5 +1,5 @@
 import api from './api';
-import type {ApiResponse, ClientUser, Provider} from "../types";
+import type {ApiResponse, ClientUser, Provider, User} from "../types";
 
 export async function listProvidersRequest() {
     const { data } = await api.get<Provider[]>("/providers");
@@ -14,6 +14,11 @@ export async function myListProvidersRequest(userId: number) {
 export async function createProviderRequest(payload: Pick<Provider, "name" | "is_active">) {
     const { data } = await api.post<Provider>("/providers", payload);
     return data;
+}
+
+export async function updateMyConnection(payload: Pick<User, "network_choice">) {
+    const { data } = await api.post<ApiResponse<User>>("/me/update-my-connection", payload);
+    return data.data;
 }
 
 export async function updateProviderRequest(

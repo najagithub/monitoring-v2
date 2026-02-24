@@ -14,6 +14,7 @@ export interface User {
   phone?: string;
   role: UserRole;
   is_active: boolean;
+  network_choice: number;
   profile_image?: string;
   profile_image_url?: string;
   created_at: string;
@@ -74,6 +75,9 @@ export interface AuthContextType {
   logout: () => void;
   updateProfile: (data: UpdateMyProfilePayload) => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+
+  updateUser: (patch: Partial<User>) => void;
+
 }
 
 export interface UpdateMyProfilePayload {

@@ -4,7 +4,7 @@ import { TrendingUp, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
 
 import { mockUserProviders, calculateMonthlyConsumption, formatBytes } from '../data/mockData';
 
-import { myListProvidersRequest } from '../services/providers.services';
+import { myListProvidersRequest, updateMyConnection } from '../services/providers.services';
 import {
   getMonthlyConsumptionRequest,
   getDailyConsumptionRequest,
@@ -15,7 +15,9 @@ const DAY_OPTIONS = [7, 15, 30] as const;
 type DayOption = (typeof DAY_OPTIONS)[number];
 
 export const ClientDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user,updateUser  } = useAuth();
+
+
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<number>(1);
@@ -94,8 +96,11 @@ export const ClientDashboard: React.FC = () => {
           setMonthlyConsumptionBytes(null);
           return;
         }
+        const savedChoice = user.network_choice; // providerId stocké
 
-        const defaultId = list[0].id;
+        const defaultId = savedChoice && list.some(p => p.id === savedChoice)
+            ? savedChoice
+            : list[0].id;
 
         setSelectedProvider(defaultId);
         setAppliedProvider(defaultId);
@@ -134,6 +139,10 @@ export const ClientDashboard: React.FC = () => {
 
     setIsLoading(true);
     try {
+
+      const updatedUser = await updateMyConnection({ network_choice: selectedProvider });
+      updateUser({ network_choice: updatedUser.network_choice });
+
       setAppliedProvider(selectedProvider);
       setFilterApplied(true);
 

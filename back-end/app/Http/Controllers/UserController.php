@@ -206,6 +206,19 @@ class UserController extends Controller
 
         return $this->success($clients);
     }
+
+    public function updateMyConnection(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'network_choice' => ['required', 'integer', 'exists:providers,id', 'distinct'],
+        ]);
+
+        $user->update($validated);
+
+        return $this->success($user->fresh(), 'Connection updated successfully');
+    }
     
 
 }

@@ -23,6 +23,7 @@ Route::prefix('v1')->group(function() {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/me/profile', [UserController::class, 'updateMyProfile']);
         Route::post('/me/password', [UserController::class, 'updateMyPassword']);
+        Route::post('/me/update-my-connection', [UserController::class, 'updateMyConnection']);
 
         Route::apiResource('users', UserController::class);
         Route::get('/providers', [ProviderController::class, 'index']);
