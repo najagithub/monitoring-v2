@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { WifiIcon } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import logo from "../assets/logo.png";
 
 export const Login: React.FC = () => {
   const [emailOrUsername, setEmailOrUsername] = useState('');
@@ -32,16 +32,17 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20">
-          <div className="flex justify-center mb-8">
-            <div className="bg-blue-500 p-4 rounded-full">
-              <WifiIcon className="w-12 h-12 text-white" />
+          <div className="flex justify-center">
+            <div className="flex justify-center overflow-hidden">
+              <img
+                  src={logo}
+                  alt="Logo Monitoring"
+                  className="w-24 h-24 object-cover scale-150"
+              />
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-center text-white mb-2">
-            Monitoring Internet
-          </h1>
-          <p className="text-center text-blue-200 mb-8">
+          <p className="text-center text-blue-200 mb-4">
             Connectez-vous pour accéder à votre tableau de bord
           </p>
 
@@ -91,13 +92,6 @@ export const Login: React.FC = () => {
             </button>
           </form>
 
-          {/*<div className="mt-8 p-4 bg-white/5 rounded-lg border border-white/10">*/}
-          {/*  <p className="text-xs text-blue-200 text-center mb-2">Comptes de d\u00e9monstration:</p>*/}
-          {/*  <div className="text-xs text-blue-100 space-y-1">*/}
-          {/*    <p><strong>Admin:</strong> admin / password</p>*/}
-          {/*    <p><strong>Client:</strong> client1 / password</p>*/}
-          {/*  </div>*/}
-          {/*</div>*/}
         </div>
       </div>
     </div>

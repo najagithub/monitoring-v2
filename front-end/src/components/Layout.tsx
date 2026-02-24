@@ -10,8 +10,8 @@ import {
   LogOut,
   Menu,
   X,
-  WifiIcon,
 } from "lucide-react";
+import logo from "../assets/favicon.png";
 
 import defaultAvatar from "../assets/avatar-default.png";
 
@@ -72,7 +72,11 @@ export const Layout: React.FC = () => {
         {/* Topbar mobile */}
         <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <WifiIcon className="w-6 h-6 text-blue-600" />
+            <img
+                src={logo}
+                alt="Logo"
+                className="w-6 h-6 object-contain"
+            />
             <span className="font-bold text-gray-900">Monitoring</span>
           </div>
           <button
@@ -100,8 +104,12 @@ export const Layout: React.FC = () => {
           <div className="h-full flex flex-col">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-600 p-2 rounded-lg">
-                  <WifiIcon className="w-6 h-6 text-white" />
+                <div className="p-2 rounded-lg shadow-sm overflow-hidden">
+                  <img
+                      src={logo}
+                      alt="Logo"
+                      className="w-8 h-8 object-contain scale-150"
+                  />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Monitoring</h1>
