@@ -84,8 +84,30 @@ const safeAvatar = (url?: string | null) => {
 
 const UPDATE_ENDPOINT = '/admin/user-provider/monthly-limit';
 
+// ✅ Persiste la sélection du provider (refresh friendly)
+const STORAGE_SELECTED_PROVIDER_KEY = 'admin_dashboard:selected_provider_id';
+
+const readStoredSelectedProviderId = (): number | null => {
+  try {
+    const raw = window?.localStorage?.getItem(STORAGE_SELECTED_PROVIDER_KEY);
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredSelectedProviderId = (providerId: number) => {
+  try {
+    window?.localStorage?.setItem(STORAGE_SELECTED_PROVIDER_KEY, String(providerId));
+  } catch {
+    // ignore (private mode / quota / SSR)
+  }
+};
+
 export const AdminDashboard: React.FC = () => {
-  const [selectedProvider, setSelectedProvider] = useState<number>(1);
+  const [selectedProvider, setSelectedProvider] = useState<number>(() => readStoredSelectedProviderId() ?? 1);
 
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -106,20 +128,44 @@ export const AdminDashboard: React.FC = () => {
   const clientUsers = users; // backend te renvoie déjà role=client
   const activeUsers = users.filter((u) => u.is_active);
 
-  const fetchUsers = async (providerId: number) => {
+  const usersFetchRef = React.useRef<{ inFlight: boolean; lastProviderId: number | null }>({
+    inFlight: false,
+    lastProviderId: null,
+  });
+
+  const fetchUsers = async (providerId: number, opts?: { silent?: boolean }) => {
+    const silent = !!opts?.silent;
+
+    // Prevent overlapping requests (ex: interval + manual actions)
+    if (usersFetchRef.current.inFlight) return;
+
     try {
-      setIsUsersLoading(true);
-      setUsersError(null);
+      usersFetchRef.current.inFlight = true;
+      usersFetchRef.current.lastProviderId = providerId;
+
+      if (!silent) {
+        setIsUsersLoading(true);
+        setUsersError(null);
+      }
 
       const { data } = await api.get(`/admin/users/summary?provider_id=${providerId}`);
 
       const list = Array.isArray(data) ? (data as UserSummaryRow[]) : ((data as any)?.data ?? []);
       setUsers(Array.isArray(list) ? list : []);
+
+      // On silent refresh, we clear error only if we succeeded
+      if (silent) setUsersError(null);
     } catch (e: any) {
-      setUsersError(e?.response?.data?.message || e?.message || 'Erreur chargement users');
-      setUsers([]);
+      if (!silent) {
+        setUsersError(e?.response?.data?.message || e?.message || 'Erreur chargement users');
+        setUsers([]);
+      } else {
+        // silent refresh: keep current table, just expose error banner
+        setUsersError(e?.response?.data?.message || e?.message || 'Erreur chargement users');
+      }
     } finally {
-      setIsUsersLoading(false);
+      usersFetchRef.current.inFlight = false;
+      if (!silent) setIsUsersLoading(false);
     }
   };
 
@@ -136,9 +182,17 @@ export const AdminDashboard: React.FC = () => {
         if (Array.isArray(list)) {
           setProviders(list);
 
+          // ✅ Restore last selection if possible
+          const stored = readStoredSelectedProviderId();
+          const hasStored = stored != null && list.some((p: any) => Number(p.id) === Number(stored));
+
           const has1 = list.some((p: any) => Number(p.id) === 1);
-          if (has1) setSelectedProvider(1);
-          else if (list[0]?.id) setSelectedProvider(Number(list[0].id));
+          const fallback = has1 ? 1 : (list[0]?.id ? Number(list[0].id) : 1);
+
+          const next = hasStored ? Number(stored) : fallback;
+
+          setSelectedProvider(next);
+          writeStoredSelectedProviderId(next);
         }
       } catch (e: any) {
         setProvidersError(e?.message || 'Impossible de charger les fournisseurs');
@@ -152,6 +206,19 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (!selectedProvider) return;
     fetchUsers(selectedProvider);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProvider]);
+
+  // ✅ Auto-refresh toutes les 15s (les tableaux ne sont pas temps réel sinon)
+  useEffect(() => {
+    if (!selectedProvider) return;
+
+    const id = window.setInterval(() => {
+      // refresh silencieux: pas de spinner, pas de reset table
+      fetchUsers(selectedProvider, { silent: true });
+    }, 15000);
+
+    return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProvider]);
 
@@ -186,33 +253,37 @@ export const AdminDashboard: React.FC = () => {
 
   return (
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Dashboard Admin</h1>
-            <p className="text-gray-500 mt-1">Vue d'ensemble de la consommation</p>
+            <p className="mt-1 text-gray-500">Vue d'ensemble de la consommation</p>
           </div>
           <button
               onClick={() => setShowUserModal(true)}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition shadow-lg hover:shadow-xl"
+              className="inline-flex items-center gap-2 px-4 py-2 text-white transition bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 hover:shadow-xl"
           >
             <Plus className="w-5 h-5" />
             Ajouter utilisateur
           </button>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Sélectionnez le fournisseur</label>
+        <div className="p-6 bg-white border border-gray-200 shadow-sm rounded-xl">
+          <label className="block mb-2 text-sm font-medium text-gray-700">Sélectionnez le fournisseur</label>
 
           {providersError && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="px-4 py-3 mb-3 text-sm text-red-700 border border-red-200 rounded-lg bg-red-50">
                 {providersError}
               </div>
           )}
 
           <select
               value={selectedProvider}
-              onChange={(e) => setSelectedProvider(Number(e.target.value))}
-              className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setSelectedProvider(next);
+                writeStoredSelectedProviderId(next);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg sm:w-64 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={isProvidersLoading || providers.length === 0}
           >
             {providers.length === 0 ? (
@@ -227,32 +298,32 @@ export const AdminDashboard: React.FC = () => {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="p-6 text-white shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium">Total Utilisateurs</p>
-                <p className="text-3xl font-bold mt-2">{clientUsers.length}</p>
+                <p className="text-sm font-medium text-blue-100">Total Utilisateurs</p>
+                <p className="mt-2 text-3xl font-bold">{clientUsers.length}</p>
               </div>
               <Users className="w-12 h-12 text-blue-200" />
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="p-6 text-white shadow-lg bg-gradient-to-br from-green-500 to-green-600 rounded-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm font-medium">Utilisateurs Actifs</p>
-                <p className="text-3xl font-bold mt-2">{activeUsers.length}</p>
+                <p className="text-sm font-medium text-green-100">Utilisateurs Actifs</p>
+                <p className="mt-2 text-3xl font-bold">{activeUsers.length}</p>
               </div>
               <Activity className="w-12 h-12 text-green-200" />
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="p-6 text-white shadow-lg bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm font-medium">Fournisseur Actuel</p>
-                <p className="text-2xl font-bold mt-2">{provider?.name || '—'}</p>
+                <p className="text-sm font-medium text-orange-100">Fournisseur Actuel</p>
+                <p className="mt-2 text-2xl font-bold">{provider?.name || '—'}</p>
               </div>
               <TrendingUp className="w-12 h-12 text-orange-200" />
             </div>
@@ -260,34 +331,34 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {usersError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="px-4 py-3 text-sm text-red-700 border border-red-200 rounded-lg bg-red-50">
               {usersError}
             </div>
         )}
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="overflow-hidden bg-white border border-gray-200 shadow-sm rounded-xl">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-xl font-bold text-gray-900">Liste des utilisateurs</h2>
             {isUsersLoading && <span className="text-sm text-gray-500">Chargement…</span>}
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
                   Utilisateur
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
                   Consommation
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
                   Limite
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-600 uppercase">
                   Statut
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-right text-gray-600 uppercase">
                   Actions
                 </th>
               </tr>
@@ -300,13 +371,13 @@ export const AdminDashboard: React.FC = () => {
                 const pct = limitMb > 0 ? (usedMb / limitMb) * 100 : 0;
 
                 return (
-                    <tr key={user.id} className="hover:bg-gray-50 transition">
+                    <tr key={user.id} className="transition hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <img
                               src={safeAvatar(user.profile_image_url)}
                               alt={user.username}
-                              className="w-10 h-10 rounded-full object-cover"
+                              className="object-cover w-10 h-10 rounded-full"
                               onError={(e) => {
                                 const img = e.currentTarget;
                                 if (img.src !== defaultAvatar) img.src = defaultAvatar;
@@ -357,7 +428,7 @@ export const AdminDashboard: React.FC = () => {
                                 setSelectedUser(user);
                                 setShowDetailsModal(true);
                               }}
-                              className="p-2 hover:bg-gray-100 rounded-lg transition"
+                              className="p-2 transition rounded-lg hover:bg-gray-100"
                               title="Voir détails"
                           >
                             <Eye className="w-4 h-4 text-gray-600" />
@@ -376,7 +447,7 @@ export const AdminDashboard: React.FC = () => {
                           {user.is_active && user.user_provider && (
                               <button
                                   onClick={() => cutConnection(user.id)}
-                                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition"
+                                  className="px-3 py-1 text-xs font-semibold text-white transition bg-red-600 rounded-lg hover:bg-red-700"
                               >
                                 Couper
                               </button>
@@ -389,7 +460,7 @@ export const AdminDashboard: React.FC = () => {
 
               {!isUsersLoading && clientUsers.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-6 py-10 text-sm text-center text-gray-500">
                       Aucun utilisateur trouvé pour ce fournisseur.
                     </td>
                   </tr>
@@ -534,12 +605,12 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
   return (
       <form onSubmit={handleSubmit} className="space-y-5">
         {submitError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{submitError}</div>
+            <div className="px-4 py-3 text-sm text-red-700 border border-red-200 rounded-lg bg-red-50">{submitError}</div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
+            <label className="block mb-2 text-sm font-medium text-gray-700">Nom</label>
             <input
                 type="text"
                 value={formData.name}
@@ -550,7 +621,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <label className="block mb-2 text-sm font-medium text-gray-700">Username</label>
             <input
                 type="text"
                 value={formData.username}
@@ -561,7 +632,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label className="block mb-2 text-sm font-medium text-gray-700">Email</label>
             <input
                 type="email"
                 value={formData.email}
@@ -572,7 +643,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone (optionnel)</label>
+            <label className="block mb-2 text-sm font-medium text-gray-700">Téléphone (optionnel)</label>
             <input
                 type="tel"
                 value={formData.phone}
@@ -582,7 +653,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
+            <label className="block mb-2 text-sm font-medium text-gray-700">Mot de passe</label>
             <input
                 type="password"
                 value={formData.password}
@@ -593,7 +664,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Router IP</label>
+            <label className="block mb-2 text-sm font-medium text-gray-700">Router IP</label>
             <input
                 type="text"
                 placeholder="192.168.0.1"
@@ -605,8 +676,8 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+        <div className="overflow-hidden border border-gray-200 rounded-xl">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <div>
               <p className="font-semibold text-gray-900">Fournisseurs / OID</p>
               <p className="text-xs text-gray-500">Ajoute 1 ou plusieurs configurations (limite en MB)</p>
@@ -614,7 +685,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
             <button
                 type="button"
                 onClick={addRow}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-2 px-3 py-2 text-white transition bg-blue-600 rounded-lg hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" />
               Ajouter une ligne
@@ -622,18 +693,18 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           </div>
 
           {providersError && (
-              <div className="px-4 py-3 text-sm text-red-700 bg-red-50 border-b border-red-100">{providersError}</div>
+              <div className="px-4 py-3 text-sm text-red-700 border-b border-red-100 bg-red-50">{providersError}</div>
           )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-white border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Provider</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">OID In</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">OID Out</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Limite (MB)</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-700">Action</th>
+                <th className="px-4 py-3 font-semibold text-left text-gray-700">Provider</th>
+                <th className="px-4 py-3 font-semibold text-left text-gray-700">OID In</th>
+                <th className="px-4 py-3 font-semibold text-left text-gray-700">OID Out</th>
+                <th className="px-4 py-3 font-semibold text-left text-gray-700">Limite (MB)</th>
+                <th className="px-4 py-3 font-semibold text-right text-gray-700">Action</th>
               </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -656,7 +727,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
                       </select>
 
                       {row.provider_id !== '' && providerById.get(Number(row.provider_id))?.is_active === false && (
-                          <p className="text-xs text-orange-600 mt-1">Provider inactif</p>
+                          <p className="mt-1 text-xs text-orange-600">Provider inactif</p>
                       )}
                     </td>
 
@@ -666,7 +737,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
                           value={row.oid_byte_in}
                           onChange={(e) => updateRow(idx, { oid_byte_in: e.target.value })}
                           placeholder="1.3.6.1..."
-                          className="w-72 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
+                          className="px-3 py-2 font-mono text-xs border border-gray-300 rounded-lg w-72 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           required
                       />
                     </td>
@@ -677,7 +748,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
                           value={row.oid_byte_out}
                           onChange={(e) => updateRow(idx, { oid_byte_out: e.target.value })}
                           placeholder="1.3.6.1..."
-                          className="w-72 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
+                          className="px-3 py-2 font-mono text-xs border border-gray-300 rounded-lg w-72 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           required
                       />
                     </td>
@@ -720,7 +791,7 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
           <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              className="flex-1 px-4 py-2 text-gray-700 transition border border-gray-300 rounded-lg hover:bg-gray-50"
               disabled={isSubmitting}
           >
             Annuler
@@ -728,10 +799,10 @@ const UserForm: React.FC<{ onClose: () => void; onCreated: () => void }> = ({ on
 
           <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+              className="inline-flex items-center justify-center flex-1 gap-2 px-4 py-2 text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
               disabled={isSubmitting}
           >
-            {isSubmitting && <span className="w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />}
+            {isSubmitting && <span className="w-4 h-4 border-2 rounded-full border-white/70 border-t-transparent animate-spin" />}
             {isSubmitting ? 'Création...' : 'Créer'}
           </button>
         </div>
@@ -836,12 +907,12 @@ const UserDetails: React.FC<{
   return (
       <div className="space-y-6">
         {err && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="px-4 py-3 text-sm text-red-700 border border-red-200 rounded-lg bg-red-50">
               {err}
             </div>
         )}
         {ok && (
-            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            <div className="px-4 py-3 text-sm text-green-700 border border-green-200 rounded-lg bg-green-50">
               {ok}
             </div>
         )}
@@ -850,7 +921,7 @@ const UserDetails: React.FC<{
           <img
               src={safeAvatar(user.profile_image_url)}
               alt={user.username}
-              className="w-20 h-20 rounded-full object-cover"
+              className="object-cover w-20 h-20 rounded-full"
               onError={(e) => {
                 const img = e.currentTarget;
                 if (img.src !== defaultAvatar) img.src = defaultAvatar;
@@ -863,24 +934,24 @@ const UserDetails: React.FC<{
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-gray-200 p-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="p-4 border border-gray-200 rounded-xl">
             <p className="text-sm text-gray-500">Consommation du mois</p>
             <p className="text-lg font-semibold text-gray-900">{formatBytes(user.total_consumption_month)}</p>
-            <p className="text-xs text-gray-500 mt-1">(~{bytesToMb(user.total_consumption_month)} MB)</p>
+            <p className="mt-1 text-xs text-gray-500">(~{bytesToMb(user.total_consumption_month)} MB)</p>
           </div>
 
-          <div className="rounded-xl border border-gray-200 p-4">
+          <div className="p-4 border border-gray-200 rounded-xl">
             <p className="text-sm text-gray-500">Limite</p>
             <p className="text-lg font-semibold text-gray-900">{formatBytes(limitBytes)}</p>
-            <p className="text-xs text-gray-500 mt-1">{monthlyLimitMb} MB</p>
+            <p className="mt-1 text-xs text-gray-500">{monthlyLimitMb} MB</p>
           </div>
         </div>
 
         <div>
-          <h4 className="font-semibold text-gray-900 mb-3">Configuration Provider</h4>
+          <h4 className="mb-3 font-semibold text-gray-900">Configuration Provider</h4>
 
-          <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+          <div className="p-4 space-y-4 rounded-lg bg-gray-50">
             <div className="flex items-center justify-between gap-3">
               <p className="font-semibold text-gray-900">{providerName || 'Provider'}</p>
 
@@ -888,18 +959,18 @@ const UserDetails: React.FC<{
                   type="button"
                   onClick={saveConfig}
                   disabled={isSaving}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-white transition bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isSaving && (
-                    <span className="w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 rounded-full border-white/70 border-t-transparent animate-spin" />
                 )}
                 {isSaving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Router IP</label>
+                <label className="block mb-1 text-xs font-medium text-gray-600">Router IP</label>
                 <input
                     value={routerIp}
                     onChange={(e) => setRouterIp(e.target.value)}
@@ -909,7 +980,7 @@ const UserDetails: React.FC<{
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Monthly limit (MB)</label>
+                <label className="block mb-1 text-xs font-medium text-gray-600">Monthly limit (MB)</label>
                 <input
                     type="number"
                     min={0}
@@ -921,26 +992,26 @@ const UserDetails: React.FC<{
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">OID In</label>
+                <label className="block mb-1 text-xs font-medium text-gray-600">OID In</label>
                 <input
                     value={oidByteIn}
                     onChange={(e) => setOidByteIn(e.target.value)}
                     placeholder="1.3.6.1..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
+                    className="w-full px-3 py-2 font-mono text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">OID Out</label>
+                <label className="block mb-1 text-xs font-medium text-gray-600">OID Out</label>
                 <input
                     value={oidByteOut}
                     onChange={(e) => setOidByteOut(e.target.value)}
                     placeholder="1.3.6.1..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
+                    className="w-full px-3 py-2 font-mono text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
-              <div className="md:col-span-2 text-xs text-gray-500">
+              <div className="text-xs text-gray-500 md:col-span-2">
                 Statut Provider:{' '}
                 <span className="font-medium text-gray-800">
                 {user.user_provider?.is_active ? 'Actif' : 'Inactif'}

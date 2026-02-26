@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { TrendingUp, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
 
@@ -36,6 +36,9 @@ export const ClientDashboard: React.FC = () => {
 
   // ✅ current month consumption from API
   const [monthlyConsumptionBytes, setMonthlyConsumptionBytes] = useState<number | null>(null);
+
+  // avoid overlapping refresh calls (interval + user actions)
+  const refreshInFlightRef = useRef(false);
 
   const getCurrentMonthKey = () => {
     const d = new Date();
@@ -77,6 +80,26 @@ export const ClientDashboard: React.FC = () => {
     setDailyUsage(normalized);
   };
 
+  const refreshConsumptionData = async (
+    userId: number,
+    providerId: number,
+    opts?: { silent?: boolean },
+  ) => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+
+    if (!opts?.silent) setIsLoading(true);
+    try {
+      await Promise.all([
+        fetchMonthlyConsumption(userId, providerId),
+        fetchDailyUsage(userId, providerId, usageDays),
+      ]);
+    } finally {
+      if (!opts?.silent) setIsLoading(false);
+      refreshInFlightRef.current = false;
+    }
+  };
+
   useEffect(() => {
     if (!user?.id) return;
 
@@ -107,10 +130,7 @@ export const ClientDashboard: React.FC = () => {
         setFilterApplied(true);
 
         // ✅ API calls
-        await Promise.all([
-          fetchMonthlyConsumption(user.id, defaultId),
-          fetchDailyUsage(user.id, defaultId, usageDays),
-        ]);
+        await refreshConsumptionData(user.id, defaultId, { silent: true });
 
         // fallback mock monthlyData (optional)
         const up = mockUserProviders
@@ -137,8 +157,8 @@ export const ClientDashboard: React.FC = () => {
   const applyFilter = async () => {
     if (!user?.id) return;
 
-    setIsLoading(true);
     try {
+      setIsLoading(true);
 
       const updatedUser = await updateMyConnection({ network_choice: selectedProvider });
       updateUser({ network_choice: updatedUser.network_choice });
@@ -146,10 +166,7 @@ export const ClientDashboard: React.FC = () => {
       setAppliedProvider(selectedProvider);
       setFilterApplied(true);
 
-      await Promise.all([
-        fetchMonthlyConsumption(user.id, selectedProvider),
-        fetchDailyUsage(user.id, selectedProvider, usageDays),
-      ]);
+      await refreshConsumptionData(user.id, selectedProvider, { silent: true });
 
       // fallback mock monthlyData (optional)
       const up = mockUserProviders
@@ -167,14 +184,21 @@ export const ClientDashboard: React.FC = () => {
     if (!user?.id || !filterApplied || !appliedProvider) return;
 
     (async () => {
-      setIsLoading(true);
-      try {
-        await fetchDailyUsage(user.id, appliedProvider, usageDays);
-      } finally {
-        setIsLoading(false);
-      }
+      await refreshConsumptionData(user.id, appliedProvider, { silent: true });
     })();
   }, [usageDays, appliedProvider, filterApplied, user?.id]);
+
+  // ✅ auto-refresh every 15s for the applied provider (real-time-ish)
+  useEffect(() => {
+    if (!user?.id || !filterApplied || !appliedProvider) return;
+
+    const id = window.setInterval(() => {
+      // silent refresh, no spinner/flicker
+      refreshConsumptionData(user.id, appliedProvider, { silent: true });
+    }, 15000);
+
+    return () => window.clearInterval(id);
+  }, [user?.id, filterApplied, appliedProvider, usageDays]);
 
   // provider appliqué (depuis API)
   const appliedProviderObj = useMemo(
@@ -207,18 +231,18 @@ export const ClientDashboard: React.FC = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Mon Dashboard</h1>
-          <p className="text-gray-500 mt-1">Suivez votre consommation internet</p>
+          <p className="mt-1 text-gray-500">Suivez votre consommation internet</p>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="p-6 bg-white border border-gray-200 shadow-sm rounded-xl">
+          <label className="block mb-2 text-sm font-medium text-gray-700">
             Sélectionnez le fournisseur
           </label>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <select
                 value={selectedProvider}
                 onChange={(e) => setSelectedProvider(Number(e.target.value))}
-                className="flex-1 sm:max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg sm:max-w-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={!isInitialized || isLoading || providers.length === 0}
             >
               {providers.map((p) => (
@@ -231,7 +255,7 @@ export const ClientDashboard: React.FC = () => {
             <button
                 onClick={applyFilter}
                 disabled={isLoading || !isInitialized || providers.length === 0}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition shadow-lg hover:shadow-xl"
+                className="px-6 py-2 font-semibold text-white transition bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed hover:shadow-xl"
             >
               {isLoading ? 'Chargement...' : 'Appliquer'}
             </button>
@@ -239,37 +263,37 @@ export const ClientDashboard: React.FC = () => {
         </div>
 
         {(isLoading || !isInitialized) && (
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 text-center">
-              <Activity className="w-10 h-10 text-gray-500 mx-auto mb-3 animate-spin" />
-              <p className="text-gray-600 font-medium">Chargement des données...</p>
+            <div className="p-8 text-center bg-white border border-gray-200 shadow-sm rounded-xl">
+              <Activity className="w-10 h-10 mx-auto mb-3 text-gray-500 animate-spin" />
+              <p className="font-medium text-gray-600">Chargement des données...</p>
             </div>
         )}
 
         {isInitialized && !isLoading && providers.length === 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-              <p className="text-yellow-800 font-medium">Aucun fournisseur actif disponible pour votre compte.</p>
+            <div className="p-4 border border-yellow-200 bg-yellow-50 rounded-xl">
+              <p className="font-medium text-yellow-800">Aucun fournisseur actif disponible pour votre compte.</p>
             </div>
         )}
 
         {filterApplied && !isLoading && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="p-6 text-white shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-blue-100 text-sm font-medium">Consommation Actuelle</p>
+                    <p className="text-sm font-medium text-blue-100">Consommation Actuelle</p>
                     <Activity className="w-8 h-8 text-blue-200" />
                   </div>
                   <p className="text-3xl font-bold">{formatBytes(totalConsumptionBytes)}</p>
-                  <p className="text-blue-100 text-sm mt-1">Ce mois-ci</p>
+                  <p className="mt-1 text-sm text-blue-100">Ce mois-ci</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+                <div className="p-6 text-white shadow-lg bg-gradient-to-br from-green-500 to-green-600 rounded-xl">
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-green-100 text-sm font-medium">Limite Mensuelle</p>
+                    <p className="text-sm font-medium text-green-100">Limite Mensuelle</p>
                     <CheckCircle className="w-8 h-8 text-green-200" />
                   </div>
                   <p className="text-3xl font-bold">{formatBytes(monthlyLimitBytes)}</p>
-                  <p className="text-green-100 text-sm mt-1">Limite définie</p>
+                  <p className="mt-1 text-sm text-green-100">Limite définie</p>
                 </div>
 
                 <div
@@ -297,11 +321,11 @@ export const ClientDashboard: React.FC = () => {
               </div>
 
               {isExceeded && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                  <div className="flex items-start gap-3 p-4 border border-red-200 bg-red-50 rounded-xl">
                     <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold text-red-900">Limite dépassée</h3>
-                      <p className="text-sm text-red-700 mt-1">
+                      <p className="mt-1 text-sm text-red-700">
                         Vous avez dépassé votre limite mensuelle de {formatBytes(monthlyLimitBytes)}. Votre
                         consommation actuelle est de {formatBytes(totalConsumptionBytes)}.
                       </p>
@@ -309,8 +333,8 @@ export const ClientDashboard: React.FC = () => {
                   </div>
               )}
 
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="p-6 bg-white border border-gray-200 shadow-sm rounded-xl">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-xl font-bold text-gray-900">
                     Graphique d'usage ({usageDays} derniers jours)
                   </h2>
@@ -320,7 +344,7 @@ export const ClientDashboard: React.FC = () => {
                     <select
                         value={usageDays}
                         onChange={(e) => setUsageDays(Number(e.target.value) as DayOption)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         disabled={isLoading || !isInitialized}
                     >
                       {DAY_OPTIONS.map((d) => (
@@ -350,9 +374,9 @@ export const ClientDashboard: React.FC = () => {
                           {formatBytes(day.total_bytes)}
                         </span>
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                              <div className="w-full h-3 overflow-hidden bg-gray-200 rounded-full">
                                 <div
-                                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500"
+                                    className="h-full transition-all duration-500 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
                                     style={{ width: `${(Number(day.total_bytes) / maxBytes) * 100}%` }}
                                 />
                               </div>
@@ -364,22 +388,22 @@ export const ClientDashboard: React.FC = () => {
               </div>
 
               {currentUserProviderApi && (
-                  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Informations de configuration</h2>
+                  <div className="p-6 bg-white border border-gray-200 shadow-sm rounded-xl">
+                    <h2 className="mb-4 text-xl font-bold text-gray-900">Informations de configuration</h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm text-gray-500 mb-1">Fournisseur</p>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="p-4 rounded-lg bg-gray-50">
+                        <p className="mb-1 text-sm text-gray-500">Fournisseur</p>
                         <p className="font-semibold text-gray-900">{appliedProviderObj?.name ?? '-'}</p>
                       </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm text-gray-500 mb-1">IP Routeur</p>
+                      <div className="p-4 rounded-lg bg-gray-50">
+                        <p className="mb-1 text-sm text-gray-500">IP Routeur</p>
                         <p className="font-semibold text-gray-900">{currentUserProviderApi.router_ip ?? '-'}</p>
                       </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm text-gray-500 mb-1">Statut</p>
+                      <div className="p-4 rounded-lg bg-gray-50">
+                        <p className="mb-1 text-sm text-gray-500">Statut</p>
                         <span
                             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
                                 currentUserProviderApi.is_active
@@ -401,8 +425,8 @@ export const ClientDashboard: React.FC = () => {
                   </span>
                       </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm text-gray-500 mb-1">Limite Mensuelle</p>
+                      <div className="p-4 rounded-lg bg-gray-50">
+                        <p className="mb-1 text-sm text-gray-500">Limite Mensuelle</p>
                         <p className="font-semibold text-gray-900">{formatBytes(monthlyLimitBytes)}</p>
                       </div>
                     </div>
