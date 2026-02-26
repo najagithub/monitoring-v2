@@ -26,28 +26,23 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        User::create([
-            'name' => 'client1',
-            'username' => 'client1',
-            'email' => 'client1@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'client',
-            'is_active' => true,
-        ]);
-        User::create([
-            'name' => 'client2',
-            'username' => 'client2',
-            'email' => 'client2@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'client',
-            'is_active' => true,
-        ]);
+        for ($i = 3; $i <= 7; $i++) {
+            User::create([
+                'name' => 'client' . $i,
+                'username' => 'client' . $i,
+                'email' => 'client' . $i . '@netpulse.com',
+                'password' => Hash::make('password'),
+                'role' => 'client',
+                'is_active' => true,
+                'network_choice' => rand(1,3)
+            ]);
+        }
 
         Provider::create(['name' => 'YAS', 'is_active' => true]);
         Provider::create(['name' => 'Starlink', 'is_active' => true]);
         Provider::create(['name' => 'Orange', 'is_active' => true]);
 
         $this->call(UserProviderSeeder::class);
-        $this->call(ConsumptionHistorySeeder::class);
+        // $this->call(ConsumptionHistorySeeder::class);
     }
 }

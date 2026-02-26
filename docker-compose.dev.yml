@@ -104,7 +104,7 @@ services:
       "
 
   web:
-    image: node:22-alpine
+    image: node:20-alpine
     container_name: monv2_front_dev
     working_dir: /app
     volumes:

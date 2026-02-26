@@ -66,7 +66,7 @@ class User extends Authenticatable
 
     public function userProviders()
     {
-        return $this->hasMany(UserProvider::class);
+        return $this->hasMany(UserProvider::class, 'user_id', 'id');
     }
 
     public function consumptionHistories()
@@ -89,6 +89,11 @@ class User extends Authenticatable
         return $this->profile_image
             ? asset('storage/' . $this->profile_image)
             : null;
+    }
+
+    public function getUserProviderForSnmpAttribute()
+    {
+        return $this->userProviders->firstWhere('provider_id', $this->network_choice);
     }
 
 }
