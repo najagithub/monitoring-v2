@@ -1,7 +1,3 @@
-// AdminDashboard.tsx (COMPLET)
-// ✅ Corrigé: oid_byte_in / oid_byte_out (au lieu de oid_in / oid_out) côté UI + payload update
-// ✅ Envoie: { id_user, provider_id, router_ip, oid_byte_in, oid_byte_out, monthly_limit } vers endpoint updateMonthlyLimit
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../components/Modal';
 import {
@@ -17,43 +13,12 @@ import {
 } from 'lucide-react';
 
 import { formatBytes } from '../data/mockData';
-import { Provider } from '../types';
+import { Provider, ProviderRow, UserSummaryRow } from '../types';
 
 import api from '../services/api';
 import { listProvidersRequest } from '../services/providers.services';
 
 import defaultAvatar from '../assets/avatar-default.png';
-
-type UserProviderSummary = {
-  router_ip: string;
-  // ✅ Champs attendus (nouveau)
-  oid_byte_in?: string;
-  oid_byte_out?: string;
-  // ⚠️ Compat si backend renvoie encore oid_in/out
-  oid_in?: string;
-  oid_out?: string;
-  is_active: boolean;
-};
-
-type UserSummaryRow = {
-  id: number;
-  profile_image_url: string;
-  name: string;
-  email: string;
-  username: string;
-  total_consumption_month: number;
-  total_consumption_month_mb: number;
-  monthly_limit_mb: number;
-  is_active: boolean;
-  user_provider: UserProviderSummary | null;
-};
-
-type ProviderRow = {
-  provider_id: number | '';
-  oid_byte_in: string;
-  oid_byte_out: string;
-  monthly_limit: string; // MB
-};
 
 const DEFAULT_ROW: ProviderRow = {
   provider_id: '',

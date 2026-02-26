@@ -13,6 +13,7 @@ class UserProvider extends Model
         'user_id',
         'provider_id',
         'router_ip',
+        'oid_name',
         'oid_byte_in',
         'oid_byte_out',
         'monthly_limit',

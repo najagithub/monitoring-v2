@@ -113,3 +113,35 @@ export type ClientUser = {
   created_at: string;
   profile_image_url?: string | null;
 };
+
+export type UserProviderSummary = {
+  router_ip: string;
+  // ✅ Champs attendus (nouveau)
+  oid_byte_in?: string;
+  oid_byte_out?: string;
+  // ⚠️ Compat si backend renvoie encore oid_in/out
+  oid_in?: string;
+  oid_out?: string;
+  is_active: boolean;
+};
+
+export type UserSummaryRow = {
+  id: number;
+  profile_image_url: string;
+  name: string;
+  email: string;
+  username: string;
+  total_consumption_month: number;
+  total_consumption_month_mb: number;
+  monthly_limit_mb: number;
+  is_active: boolean;
+  user_provider: UserProviderSummary | null;
+};
+
+
+export type ProviderRow = {
+  provider_id: number | '';
+  oid_byte_in: string;
+  oid_byte_out: string;
+  monthly_limit: string; // MB
+};

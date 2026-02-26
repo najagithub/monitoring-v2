@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('provider_id')->constrained()->onDelete('cascade');
             $table->string('router_ip');
+            $table->string('oid_name');
             $table->string('oid_byte_in');
             $table->string('oid_byte_out');
             $table->bigInteger('monthly_limit')->default(0);

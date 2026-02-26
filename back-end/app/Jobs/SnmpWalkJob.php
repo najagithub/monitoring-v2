@@ -64,15 +64,18 @@ class SnmpWalkJob implements ShouldQueue
                 $uptimeLine = $this->snmpwalkLine($ip, $oid_up_time);
                 $outOctLine = $this->snmpwalkLine($ip, $provider->oid_byte_out);
                 $inOctLine  = $this->snmpwalkLine($ip, $provider->oid_byte_in);
+                $oidName  = $this->snmpwalkLine($ip, $provider->oid_name);
 
                 $uptime = $this->parseSnmpValue($uptimeLine); // ['value' => 208900]
                 $outOct = $this->parseSnmpValue($outOctLine); // ['value' => "51311"]
                 $inOct  = $this->parseSnmpValue($inOctLine);  // ['value' => "4707"]
+                $interfaceName  = $this->parseSnmpValue($oidName);  // ['value' => "4707"]
 
                 $data = [
                     'user_id' => $provider->user_id,
                     'provider_id' => $provider->provider_id,
                     'device_ip' => $ip,
+                    'oid_name' => $interfaceName['value'],
                     'uptime_ticks' => (int) $uptime['value'],     // 208900 (centièmes de seconde)
                     'in_octets' => (int) $inOct['value'],         // "4707"
                     'out_octets' => (int) $outOct['value'],       // "51311"
@@ -180,46 +183,58 @@ class SnmpWalkJob implements ShouldQueue
     }
 
     public function parseSnmpValue(string $line): array
-    {
-        // Exemple line:
-        // "iso.3.6.1.2.1.1.3.0 = Timeticks: (208900) 0:34:49.00"
-        // "iso.3.6.1.2.1.31.1.1.1.10.9 = Counter64: 51311"
+{
+    // Exemples:
+    // iso.3.6.1.2.1.1.3.0 = Timeticks: (430300) 1:11:43.00
+    // iso.3.6.1.2.1.31.1.1.1.10.4 = Counter64: 96316
+    // iso.3.6.1.2.1.2.2.1.2.4 = STRING: "LAN3"
 
-        $out = [
-            'oid' => null,
-            'type' => null,
-            'value' => null,     // int|string selon le type
-            'raw' => $line,
-        ];
+    $out = [
+        'oid'   => null,
+        'type'  => null,
+        'value' => null,   // int|string
+        'raw'   => $line,
+    ];
 
-        // OID avant le "="
-        if (preg_match('/^(.*?)\s*=\s*(.*)$/', trim($line), $m)) {
-            $out['oid'] = trim($m[1]);
-            $rhs = trim($m[2]);
+    $line = trim($line);
 
-            // Timeticks
-            if (preg_match('/^Timeticks:\s*\((\d+)\)\s*(.*)$/', $rhs, $t)) {
-                $out['type'] = 'timeticks';
-                $out['value'] = (int)$t[1];        // ici: 208900 (en centièmes de seconde)
-                $out['human'] = trim($t[2]);       // "0:34:49.00"
-                return $out;
-            }
-
-            // Counter64 / Counter32 / Gauge32 etc.
-            if (preg_match('/^([A-Za-z0-9]+):\s*([0-9]+)\s*$/', $rhs, $c)) {
-                $out['type'] = strtolower($c[1]);  // "counter64"
-                // attention: Counter64 peut dépasser int sur certains systèmes -> garde en string si tu veux safe
-                $out['value'] = $c[2];             // "51311"
-                return $out;
-            }
-
-            // Fallback: prendre tout à droite
-            $out['type'] = 'raw';
-            $out['value'] = (int) ($rhs ?? 0);
-        }
-
+    // OID avant le "=" et partie droite
+    if (!preg_match('/^(.*?)\s*=\s*(.*)$/', $line, $m)) {
         return $out;
     }
+
+    $out['oid'] = trim($m[1]);
+    $rhs = trim($m[2]);
+
+    // 1) Timeticks
+    if (preg_match('/^Timeticks:\s*\((\d+)\)\s*(.*)$/', $rhs, $t)) {
+        $out['type']  = 'timeticks';
+        $out['value'] = (int) $t[1];     // ex: 430300
+        $out['human'] = trim($t[2]);     // ex: 1:11:43.00
+        return $out;
+    }
+
+    // 2) STRING: "LAN3"  (ou STRING: LAN3)
+    if (preg_match('/^STRING:\s*(?:"([^"]*)"|(.*))$/', $rhs, $s)) {
+        $out['type']  = 'string';
+        $out['value'] = isset($s[1]) && $s[1] !== '' ? $s[1] : trim($s[2] ?? '');
+        return $out;
+    }
+
+    // 3) Counter64 / Counter32 / Gauge32 / Integer / etc.
+    if (preg_match('/^([A-Za-z0-9]+):\s*(-?\d+)\s*$/', $rhs, $c)) {
+        $out['type'] = strtolower($c[1]);
+        // Si tu veux SAFE pour Counter64, garde en string:
+        $out['value'] = $c[2]; // ex: "96316"
+        return $out;
+    }
+
+    // 4) Fallback: renvoyer la partie droite brute (sans type reconnu)
+    $out['type']  = 'raw';
+    $out['value'] = $rhs;
+
+    return $out;
+}
 
     public function snmpwalkLine(string $ip, string $oid, string $community = 'public'): string
     {

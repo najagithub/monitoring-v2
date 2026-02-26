@@ -36,6 +36,7 @@ class UserProviderSeeder extends Seeder
                         'router_ip'      => '10.10.'.$i.'.1',
 
                         // Exemple OID SNMP (ifHCInOctets / ifHCOutOctets pour l’interface index 6)
+                        'oid_name'    => '.1.3.6.1.2.1.2.2.1.2.'.$oid,
                         'oid_byte_in'    => '.1.3.6.1.2.1.31.1.1.1.6.'.$oid,
                         'oid_byte_out'   => '.1.3.6.1.2.1.31.1.1.1.10.'.$oid,
 
