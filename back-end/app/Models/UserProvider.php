@@ -18,11 +18,13 @@ class UserProvider extends Model
         'oid_byte_out',
         'monthly_limit',
         'is_active',
+        'internet_status',
     ];
 
     protected $casts = [
         'monthly_limit' => 'integer',
         'is_active' => 'boolean',
+        'internet_status' => 'boolean',
     ];
 
     public function user()

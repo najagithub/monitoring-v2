@@ -21,6 +21,8 @@ return new class extends Migration
             $table->string('oid_byte_out');
             $table->bigInteger('monthly_limit')->default(0);
             $table->boolean('is_active')->default(true);
+            $table->boolean('internet_status')
+                  ->default(true);
             $table->timestamps();
 
             $table->unique(['user_id', 'provider_id']);

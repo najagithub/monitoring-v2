@@ -39,6 +39,7 @@ export interface UserProvider {
   oid_byte_out: string;
   monthly_limit: number;
   is_active: boolean;
+  internet_status: boolean;
   created_at: string;
   updated_at: string;
   provider?: Provider;
@@ -123,6 +124,7 @@ export type UserProviderSummary = {
   oid_in?: string;
   oid_out?: string;
   is_active: boolean;
+  internet_status: boolean;
 };
 
 export type UserSummaryRow = {

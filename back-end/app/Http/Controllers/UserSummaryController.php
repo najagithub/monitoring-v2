@@ -77,6 +77,7 @@ class UserSummaryController extends Controller
                     'oid_byte_in' => $up->oid_byte_in,
                     'oid_byte_out' => $up->oid_byte_out,
                     'is_active' => (bool) $up->is_active,
+                    'internet_status' => (bool) $up->internet_status,
                 ] : null,
             ];
         });

@@ -28,6 +28,7 @@ class User extends Authenticatable
         'is_active',
         'profile_image',
         'network_choice'
+
     ];
 
     /**

@@ -10,6 +10,8 @@ import {
   PowerOff,
   AlertCircle,
   CheckCircle,
+  WifiOff,
+  Wifi
 } from 'lucide-react';
 
 import { formatBytes } from '../data/mockData';
@@ -212,10 +214,6 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const cutConnection = (userId: number) => {
-    alert(`Connexion stoppée pour l'utilisateur ${userId}`);
-  };
-
   return (
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -410,12 +408,19 @@ export const AdminDashboard: React.FC = () => {
                           </button>
 
                           {user.is_active && user.user_provider && (
-                              <button
-                                  onClick={() => cutConnection(user.id)}
-                                  className="px-3 py-1 text-xs font-semibold text-white transition bg-red-600 rounded-lg hover:bg-red-700"
-                              >
-                                Couper
-                              </button>
+                              <div className="flex items-center justify-center">
+                              {user.user_provider.internet_status ? (
+                                <Wifi 
+                                  className="w-5 h-5 text-green-500"
+                                  strokeWidth={3}
+                                />
+                              ) : (
+                                <WifiOff 
+                                  className="w-5 h-5 text-red-500"
+                                  strokeWidth={3}
+                                />
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>

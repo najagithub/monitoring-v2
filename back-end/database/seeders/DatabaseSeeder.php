@@ -38,9 +38,8 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        Provider::create(['name' => 'YAS', 'is_active' => true]);
+        Provider::create(['name' => 'Yas', 'is_active' => true]);
         Provider::create(['name' => 'Starlink', 'is_active' => true]);
-        Provider::create(['name' => 'Orange', 'is_active' => true]);
 
         $this->call(UserProviderSeeder::class);
         // $this->call(ConsumptionHistorySeeder::class);

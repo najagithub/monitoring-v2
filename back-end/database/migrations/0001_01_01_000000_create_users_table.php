@@ -23,8 +23,7 @@ return new class extends Migration
             $table->string('profile_image')->nullable();
             $table->integer('network_choice')
                   ->default(1);
-            $table->boolean('internet_status')
-                  ->default(false);
+            
             $table->rememberToken();
             $table->timestamps();
         });
