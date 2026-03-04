@@ -53,12 +53,18 @@ class MikrotikRoutingScript
         $ipRange   = $plageIp;
 
         // On garde EXACTEMENT ta logique MikroTik
-        return <<<CMD
-        /routing rule
-        {$rules['starlink']} [find comment="{$interface} -> Starlink (MANUAL)"]
-        {$rules['yas']} [find comment="{$interface} -> Yas (MANUAL)"]
-        {$rules['noinet']} [find comment="{$interface} -> NO INTERNET (DEFAULT)"]
-        /ip firewall connection remove [find src-address~"{$ipRange}"]
-        CMD;
+        // return <<<CMD
+        // /routing rule
+        // {$rules['starlink']} [find comment="{$interface} -> Starlink (MANUAL)"]
+        // {$rules['yas']} [find comment="{$interface} -> Yas (MANUAL)"]
+        // {$rules['noinet']} [find comment="{$interface} -> NO INTERNET (DEFAULT)"]
+        // /ip firewall connection remove [find src-address~"{$ipRange}"]
+        // CMD;
+
+        return "/routing rule; "
+        . "{$rules['starlink']} [find comment=\"{$interface} -> Starlink (MANUAL)\"]; "
+        . "{$rules['yas']} [find comment=\"{$interface} -> Yas (MANUAL)\"]; "
+        . "{$rules['noinet']} [find comment=\"{$interface} -> NO INTERNET (DEFAULT)\"]; "
+        . "/ip firewall connection remove [find src-address~\"{$ipRange}\"]";
     }
 }

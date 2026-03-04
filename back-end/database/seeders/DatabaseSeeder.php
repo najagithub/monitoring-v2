@@ -34,12 +34,12 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role' => 'client',
                 'is_active' => true,
-                'network_choice' => rand(1,2)
+                'network_choice' => 1#rand(1,2)
             ]);
         }
-
-        Provider::create(['name' => 'Yas', 'is_active' => true]);
+        
         Provider::create(['name' => 'Starlink', 'is_active' => true]);
+        Provider::create(['name' => 'Yas', 'is_active' => true]);
 
         $this->call(UserProviderSeeder::class);
         // $this->call(ConsumptionHistorySeeder::class);

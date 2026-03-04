@@ -99,7 +99,7 @@ class SnmpWalkJob implements ShouldQueue
                 $curOut = (int) $outOct['value'];
 
                 
-                DB::transaction(function () use ($provider, $ip, $curUptime, $curIn, $curOut, $choiceNetworkName, $interfaceName){
+                DB::transaction(function () use ($provider, $ip, $curUptime, $curIn, $curOut, $choiceNetworkName, $interfaceName, $mikrotik){
                     $stats = SnmpCounterStats::where('user_id', $provider->user_id)
                                 ->where('provider_id', $provider->provider_id)
                                 ->lockForUpdate()
@@ -142,10 +142,6 @@ class SnmpWalkJob implements ShouldQueue
 
                     $switchInternet = MikrotikRoutingScript::build(interfaceName: $interface_name, plageIp: $plage_ip, switchTo: $choiceNetworkName);
 
-
-                    Log::info('stop Internet Cmd '. $stopInternet);
-                    Log::info('switch Internet to ' .$choiceNetworkName. ' Cmd ' .$switchInternet );
-
                     Log::info('*****************************************');
                     Log::info('*****************************************');
                     Log::info('*******************END*******************');
@@ -155,20 +151,44 @@ class SnmpWalkJob implements ShouldQueue
                     Log::info("total_bytes ".$total_bytes." provider name : ".$choiceNetworkName);
                     if ($provider->internet_status && $total_bytes <= $provider->monthly_limit) {
                         Log::info("On continue internet_status = 1 et total_bytes <= monthly_limit ");
+                        $result = $mikrotik->exec($switchInternet);
 
+                        Log::info('Mikrotik switch Internet to ' .$choiceNetworkName, [
+                            'output' => $result
+                        ]);
+                        Log::info('switch Internet Cmd '. $switchInternet);
                     }
                     if (!$provider->internet_status && $total_bytes <= $provider->monthly_limit) {
                         Log::info("Connexion internet doit être réactivé internet_status = 0 et total_bytes <= monthly_limit ");
+                        $result = $mikrotik->exec($switchInternet);
+
+                        Log::info('Mikrotik switch Internet to ' .$choiceNetworkName, [
+                            'output' => $result
+                        ]);
+                        Log::info('switch Internet Cmd '. $switchInternet);
                         $provider->update([
                             'internet_status' => true
                         ]);
                     }
                     if (!$provider->internet_status && $total_bytes >= $provider->monthly_limit) {
                         Log::info("Connexion internet coupée : internet_status = 0 et total_bytes >= monthly_limit ". $this->convertBytes($total_bytes, 'GB'));
+                        $result = $mikrotik->exec($stopInternet);
+
+                        Log::info('Mikrotik stop result ', [
+                            'output' => $result
+                        ]);
                         return;
                     }
                     if ($provider->internet_status && $total_bytes >= $provider->monthly_limit) {
                         Log::info("Connexion internet censé coupée : internet_status = 1 et total_bytes >= monthly_limit, internet_status updated". $this->convertBytes($total_bytes, 'GB'));
+                        
+                        $result = $mikrotik->exec($stopInternet);
+
+                        Log::info('Mikrotik stop result ', [
+                            'output' => $result
+                        ]);
+                        Log::info('stop Internet Cmd '. $stopInternet);
+                        
                         $provider->update([
                             'internet_status' => false
                         ]);

@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\UserProvider;
+use App\Services\MikrotikService;
+use App\Support\MikrotikRoutingScript;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -207,15 +210,37 @@ class UserController extends Controller
         return $this->success($clients);
     }
 
-    public function updateMyConnection(Request $request)
+    public function updateMyConnection(Request $request, MikrotikService $mikrotik)
     {
         $user = $request->user();
 
         $validated = $request->validate([
             'network_choice' => ['required', 'integer', 'exists:providers,id', 'distinct'],
         ]);
-
         $user->update($validated);
+        
+        $provider = $user->user_provider_for_snmp;
+        $choiceNetworkName = $provider->provider->name;
+
+        Log::info('Provider to change '.json_encode($provider));
+        Log::info('choiceNetworkName '.($choiceNetworkName));
+
+        $parts = explode('.', $provider->router_ip);
+        array_pop($parts);
+
+        $plage_ip = implode('.', $parts).".";
+        $interface_name = 'LAN'.$user->id+1;
+        $switchInternet = MikrotikRoutingScript::build(interfaceName: $interface_name, plageIp: $plage_ip, switchTo: $choiceNetworkName);
+
+        $result = $mikrotik->exec($switchInternet);
+
+        Log::info('Mikrotik switch Internet to ' .$choiceNetworkName, [
+            'output' => $result
+        ]);
+        Log::info('switch Internet Cmd '. $switchInternet);
+
+        
+
 
         return $this->success($user->fresh(), 'Connection updated successfully');
     }
