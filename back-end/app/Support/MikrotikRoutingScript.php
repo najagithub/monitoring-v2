@@ -65,6 +65,7 @@ class MikrotikRoutingScript
         . "{$rules['starlink']} [find comment=\"{$interface} -> Starlink (MANUAL)\"]; "
         . "{$rules['yas']} [find comment=\"{$interface} -> Yas (MANUAL)\"]; "
         . "{$rules['noinet']} [find comment=\"{$interface} -> NO INTERNET (DEFAULT)\"]; "
-        . "/ip firewall connection remove [find src-address~\"{$ipRange}\"]";
+        // . "/ip firewall connection remove [find src-address~\"{$ipRange}\"]"
+        ;
     }
 }
