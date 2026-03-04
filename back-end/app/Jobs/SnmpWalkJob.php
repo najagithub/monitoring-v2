@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Models\ConsumptionHistory;
 use App\Models\SnmpCounterStats;
 use App\Models\User;
+use App\Services\MikrotikService;
+use App\Support\MikrotikRoutingScript;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -29,22 +31,34 @@ class SnmpWalkJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(MikrotikService $mikrotik): void
     {
         
         $start = 'Job exécuté à : ' . now()->toDateTimeString();
         
         // Option 1: afficher via commande shell (Process)
         
-        $users = User::with('userProviders')->where('role','!=','admin')->where('is_active',1)->get();
+        $users = User::with(['userProviders','providers'])->where('role','!=','admin')->where('is_active',1)->get();
         
         $oid_up_time = env('SNMP_UP_TIME','.1.3.6.1.2.1.1.3.0');
         Log::info($start);
+        
+        // $result = $mikrotik->exec($cmd);
 
+        // Log::info('Mikrotik result', [
+        //     'output' => $result
+        // ]);
+        Log::info('------------------------------------');
+        Log::info('------------------------------------');
+        Log::info('------------------------------------');
+        Log::info('------------------------------------');
+        Log::info('------------------------------------');
         foreach ($users as $user) {
 
             $provider = $user->user_provider_for_snmp;
 
+            $choiceNetworkName = $provider->provider->name;
+            
             if (!$provider) {
                 continue;
             }
@@ -84,7 +98,8 @@ class SnmpWalkJob implements ShouldQueue
                 $curIn  = (int) $inOct['value'];         // Counter64 -> BIGINT
                 $curOut = (int) $outOct['value'];
 
-                DB::transaction(function () use ($provider, $ip, $curUptime, $curIn, $curOut){
+                
+                DB::transaction(function () use ($provider, $ip, $curUptime, $curIn, $curOut, $choiceNetworkName, $interfaceName){
                     $stats = SnmpCounterStats::where('user_id', $provider->user_id)
                                 ->where('provider_id', $provider->provider_id)
                                 ->lockForUpdate()
@@ -112,10 +127,35 @@ class SnmpWalkJob implements ShouldQueue
                         ->sum('total_bytes'); 
                     $total_bytes = (int) $total_bytes ?? 0;
                         
-                    
-                        Log::info("total_bytes ".$total_bytes);
+                    Log::info('*****************************************');
+                    Log::info('*****************************************');
+                    Log::info('*****************START*******************');
+                    Log::info('*****************************************');
+                    Log::info('*****************************************');
+                    $choiceNetworkName = strtolower($choiceNetworkName);
+                    $parts = explode('.', $provider->router_ip);
+                    array_pop($parts);
+
+                    $plage_ip = implode('.', $parts).".";
+                    $interface_name = $interfaceName['value'];
+                    $stopInternet = MikrotikRoutingScript::build(interfaceName: $interface_name, plageIp: $plage_ip, switchTo: "stop");
+
+                    $switchInternet = MikrotikRoutingScript::build(interfaceName: $interface_name, plageIp: $plage_ip, switchTo: $choiceNetworkName);
+
+
+                    Log::info('stop Internet Cmd '. $stopInternet);
+                    Log::info('switch Internet to ' .$choiceNetworkName. ' Cmd ' .$switchInternet );
+
+                    Log::info('*****************************************');
+                    Log::info('*****************************************');
+                    Log::info('*******************END*******************');
+                    Log::info('*****************************************');
+                    Log::info('*****************************************');
+
+                    Log::info("total_bytes ".$total_bytes." provider name : ".$choiceNetworkName);
                     if ($provider->internet_status && $total_bytes <= $provider->monthly_limit) {
                         Log::info("On continue internet_status = 1 et total_bytes <= monthly_limit ");
+
                     }
                     if (!$provider->internet_status && $total_bytes <= $provider->monthly_limit) {
                         Log::info("Connexion internet doit être réactivé internet_status = 0 et total_bytes <= monthly_limit ");
