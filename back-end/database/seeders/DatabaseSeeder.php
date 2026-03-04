@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        for ($i = 3; $i <= 7; $i++) {
+        for ($i = 3; $i <= 13; $i++) {
             User::create([
                 'name' => 'client' . $i,
                 'username' => 'client' . $i,
