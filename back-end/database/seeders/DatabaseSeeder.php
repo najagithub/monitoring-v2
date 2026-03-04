@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role' => 'client',
                 'is_active' => true,
-                'network_choice' => rand(1,3)
+                'network_choice' => rand(1,2)
             ]);
         }
 
