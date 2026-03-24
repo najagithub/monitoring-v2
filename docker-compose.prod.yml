@@ -1,0 +1,140 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: monv2_db
+    environment:
+      MYSQL_DATABASE: monitor
+      MYSQL_USER: monitoring
+      MYSQL_PASSWORD: monitoring
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_monitoring_test:/var/lib/mysql
+    networks: [appmonitoringnet]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: monv2_redis
+    ports:
+      - "6379:6379"
+    networks: [appmonitoringnet]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: monv2_api_dev
+    working_dir: /var/www
+    volumes:
+      - ./back-end:/var/www
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [appmonitoringnet]
+    command: >
+      sh -lc "
+        composer install &&
+        php artisan config:clear &&
+        php artisan cache:clear &&
+        php artisan storage:link || true &&
+        chmod -R 775 storage bootstrap/cache &&
+        php artisan serve --host=0.0.0.0 --port=8000
+      "
+
+  queue:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: monv2_queue
+    working_dir: /var/www
+    volumes:
+      - ./back-end:/var/www
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks: [appmonitoringnet]
+    command: >
+      sh -lc "
+        composer install &&
+        php artisan queue:work --sleep=1 --tries=3 --timeout=90
+      "
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.dev
+    container_name: monv2_scheduler
+    working_dir: /var/www
+    volumes:
+      - ./back-end:/var/www
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks: [appmonitoringnet]
+    command: >
+      sh -lc "
+        composer install &&
+        while true; do
+          php artisan schedule:run --no-interaction;
+          sleep 60;
+        done
+      "
+
+  web:
+    image: node:20-alpine
+    container_name: monv2_front_dev
+    working_dir: /app
+    volumes:
+      - ./front-end:/app
+    ports:
+      - "3000:3000"
+    networks: [appmonitoringnet]
+    command: >
+      sh -lc "
+        npm install &&
+        npm run dev -- --host 0.0.0.0 --port 3000
+      "
+  nginx:
+    image: nginx:alpine
+    container_name: monv2_nginx
+    depends_on:
+      - web
+      - api
+    ports:
+      - "8081:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [appmonitoringnet]
+
+volumes:
+  db_monitoring_test:
+
+networks:
+  appmonitoringnet:
+    driver: bridge
+
+# docker exec -it monv2_api_dev php artisan migrate --seed
+# docker exec -it monv2_api_dev php artisan migrate:refresh --seed
