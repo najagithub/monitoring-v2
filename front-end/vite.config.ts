@@ -5,8 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',
-    port: 3000
+    host: true,
+    allowedHosts: ['app.netpulse-mg.com'],
   },
   optimizeDeps: {
     include: ['lucide-react'],

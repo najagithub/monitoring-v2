@@ -25,7 +25,7 @@ interface NavItem {
 export const Layout: React.FC = () => {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
+  console.log('user ',user)
   const dashboardPath = user?.role === "admin" ? "/admin" : "/client";
 
   const navItems: NavItem[] = [
@@ -126,6 +126,10 @@ export const Layout: React.FC = () => {
                     className="w-10 h-10 rounded-full object-cover"
                     onError={(e) => {
                       // fallback si URL cassée
+console.log('url cassée ',user)
+console.log('VITE_API_URL =', (import.meta as any).env?.VITE_API_URL);
+console.log('user.profile_image =', user?.profile_image);
+console.log('user.profile_image_url =', (user as any)?.profile_image_url);
                       e.currentTarget.src = defaultAvatar;
                     }}
                 />

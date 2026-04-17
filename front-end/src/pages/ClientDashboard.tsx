@@ -75,7 +75,7 @@ export const ClientDashboard: React.FC = () => {
           bytes_out: Number(d.bytes_out ?? 0),
           total_bytes: Number(d.total_bytes ?? 0),
         }))
-        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     setDailyUsage(normalized);
   };

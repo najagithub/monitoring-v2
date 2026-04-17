@@ -151,6 +151,7 @@ class SnmpWalkJob implements ShouldQueue
                     Log::info("total_bytes ".$total_bytes." provider name : ".$choiceNetworkName);
                     if ($provider->internet_status && $total_bytes <= $provider->monthly_limit) {
                         Log::info("On continue internet_status = 1 et total_bytes <= monthly_limit ");
+			Log::info("Notre internet ".$switchInternet);
                         $result = $mikrotik->exec($switchInternet);
 
                         Log::info('Mikrotik switch Internet to ' .$choiceNetworkName, [

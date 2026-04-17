@@ -11,16 +11,20 @@ export const Profile: React.FC = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
-  const storageBaseUrl = useMemo(() => {
-    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
-    if (!apiUrl) return '';
-    return apiUrl.replace(/\/api\/?$/, '');
-  }, []);
+
+const storageBaseUrl = useMemo(() => {
+  const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+  if (!apiUrl) return '';
+
+  return apiUrl.replace(/\/api\/v1\/?$/, '');
+}, []);
 
   const initialProfileImageUrl = useMemo(() => {
+    console.log("storageBaseUrl ", storageBaseUrl);
     if (!user?.profile_image) return '';
     // si déjà une URL complète
     if (/^https?:\/\//i.test(user.profile_image)) return user.profile_image;
+
     // sinon chemin relatif stocké en DB : profiles/xxx.jpg => /storage/profiles/xxx.jpg
     if (!storageBaseUrl) return `/storage/${user.profile_image}`;
     return `${storageBaseUrl}/storage/${user.profile_image}`;

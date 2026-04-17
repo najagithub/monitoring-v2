@@ -2,13 +2,14 @@ services:
   db:
     image: mysql:8.4
     container_name: monv2_db
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: monitor
       MYSQL_USER: monitoring
       MYSQL_PASSWORD: monitoring
       MYSQL_ROOT_PASSWORD: root
     ports:
-      - "3306:3306"
+      - "3309:3306"
     volumes:
       - db_monitoring_test:/var/lib/mysql
     networks: [appmonitoringnet]
@@ -21,6 +22,7 @@ services:
   redis:
     image: redis:7.4-alpine
     container_name: monv2_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     networks: [appmonitoringnet]
@@ -35,6 +37,7 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile.dev
     container_name: monv2_api_dev
+    restart: unless-stopped
     working_dir: /var/www
     volumes:
       - ./back-end:/var/www
@@ -61,6 +64,7 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile.dev
     container_name: monv2_queue
+    restart: unless-stopped
     working_dir: /var/www
     volumes:
       - ./back-end:/var/www
@@ -83,6 +87,7 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile.dev
     container_name: monv2_scheduler
+    restart: unless-stopped
     working_dir: /var/www
     volumes:
       - ./back-end:/var/www
@@ -106,11 +111,12 @@ services:
   web:
     image: node:20-alpine
     container_name: monv2_front_dev
+    restart: unless-stopped
     working_dir: /app
     volumes:
       - ./front-end:/app
     ports:
-      - "3000:3000"
+      - "3005:3000"
     networks: [appmonitoringnet]
     command: >
       sh -lc "
