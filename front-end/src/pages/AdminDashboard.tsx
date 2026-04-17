@@ -43,12 +43,11 @@ const normalizeUrl = (url?: string | null) => {
   if (u.startsWith('/')) return `${API_BASE}${u}`;
   return `${API_BASE}/${u}`;
 };
-const storageBaseUrl = useMemo(() => {
-    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
-    if (!apiUrl) return '';
+const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
 
-    return apiUrl.replace(/\/api\/v1\/?$/, '');
-  }, []);
+const storageBaseUrl = apiUrl
+  ? apiUrl.replace(/\/api\/v1\/?$/, '')
+  : '';
   
 const safeAvatar = (profileImage?: string | null) => {
   if (!profileImage) return defaultAvatar;

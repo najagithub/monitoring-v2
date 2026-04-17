@@ -130,6 +130,7 @@ export type UserProviderSummary = {
 export type UserSummaryRow = {
   id: number;
   profile_image_url: string;
+  profile_image: string;
   name: string;
   email: string;
   username: string;
