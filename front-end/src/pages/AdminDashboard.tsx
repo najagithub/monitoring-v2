@@ -50,6 +50,7 @@ const storageBaseUrl = apiUrl
   : '';
   
 const safeAvatar = (profileImage?: string | null) => {
+  console.log("---> ",profileImage)
   if (!profileImage) return defaultAvatar;
 
   // déjà URL complète
