@@ -43,10 +43,23 @@ const normalizeUrl = (url?: string | null) => {
   if (u.startsWith('/')) return `${API_BASE}${u}`;
   return `${API_BASE}/${u}`;
 };
+const storageBaseUrl = useMemo(() => {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    if (!apiUrl) return '';
 
-const safeAvatar = (url?: string | null) => {
-  const u = normalizeUrl(url);
-  return u ? u : defaultAvatar;
+    return apiUrl.replace(/\/api\/v1\/?$/, '');
+  }, []);
+  
+const safeAvatar = (profileImage?: string | null) => {
+  if (!profileImage) return defaultAvatar;
+
+  // déjà URL complète
+  if (/^https?:\/\//i.test(profileImage)) return profileImage;
+
+  // sinon chemin relatif
+  if (!storageBaseUrl) return `/storage/${profileImage}`;
+
+  return `${storageBaseUrl}/storage/${profileImage}`;
 };
 
 const UPDATE_ENDPOINT = '/admin/user-provider/monthly-limit';
@@ -79,6 +92,7 @@ export const AdminDashboard: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSummaryRow | null>(null);
+  
 
   // Providers
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -338,7 +352,7 @@ export const AdminDashboard: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <img
-                              src={safeAvatar(user.profile_image_url)}
+                              src={safeAvatar(user.profile_image)}
                               alt={user.username}
                               className="object-cover w-10 h-10 rounded-full"
                               onError={(e) => {
@@ -889,7 +903,7 @@ const UserDetails: React.FC<{
 
         <div className="flex items-center gap-4">
           <img
-              src={safeAvatar(user.profile_image_url)}
+              src={safeAvatar(user.profile_image)}
               alt={user.username}
               className="object-cover w-20 h-20 rounded-full"
               onError={(e) => {
