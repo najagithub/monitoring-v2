@@ -55,6 +55,7 @@ class UserSummaryController extends Controller
             return [
                 'id' => $u->id,
                 'profile_image_url' => $u->profile_image_url,
+                'profile_image' => $u->profile_image,
                 'name' => $u->name,
                 'email' => $u->email,
                 'username' => $u->username,
