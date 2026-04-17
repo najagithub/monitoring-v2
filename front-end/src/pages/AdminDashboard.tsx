@@ -54,10 +54,11 @@ const safeAvatar = (profileImage?: string | null) => {
 
   // déjà URL complète
   if (/^https?:\/\//i.test(profileImage)) return profileImage;
-
+  console.log(' admin storageBaseUrl ',storageBaseUrl)
   // sinon chemin relatif
   if (!storageBaseUrl) return `/storage/${profileImage}`;
-
+  console.log(` url --> ${storageBaseUrl}/storage/${profileImage}`)
+  
   return `${storageBaseUrl}/storage/${profileImage}`;
 };
 
